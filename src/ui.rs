@@ -114,15 +114,15 @@ impl WindowHandler for UiLogic {
         draw_grid(graphics);
         match self.state {
             WaitSubject => {
-                draw_state_text("Input Subject Polygon\n(MidMB=Undo, RightMB=Close Curve, Enter=Next Step)", &self.font, graphics);
+                draw_state_text("Input Subject Polygon (RED)\n(Esc=Undo, RightMB=Close Curve, Enter=Next Step)", &self.font, graphics);
                 draw_polygon_with_hint(&self.new_polygon_part, &self.cursor, Color::RED, graphics);
             },
             UiState::WaitClipping => {
-                draw_state_text("Input Clipping Polygon\n(MidMB=Undo, RightMB=Close Curve, Enter=Next Step)", &self.font, graphics);
+                draw_state_text("Input Clipping Polygon (GREEN)\n(Esc=Undo, RightMB=Close Curve, Enter=Next Step)", &self.font, graphics);
                 draw_polygon_with_hint(&self.new_polygon_part, &self.cursor, Color::GREEN, graphics);
             },
             UiState::InputDone => {
-                draw_state_text("Result\n(Enter = Clear)", &self.font, graphics);
+                draw_state_text("Result (BLUE)\n(Enter = Clear)", &self.font, graphics);
             }
         }
         draw_polygon(&self.subject_polygon, EDGE_THICKNESS, Color::RED, graphics);
@@ -168,14 +168,7 @@ impl WindowHandler for UiLogic {
                 self.new_polygon_part.clear();
             }
             MouseButton::Middle => {
-                if self.new_polygon_part.is_empty() {
-                    self.state = UiState::WaitSubject;
-                    self.subject_polygon.clear();
-                    self.clipping_polygon.clear();
-                    self.result_polygon.clear();
-                } else {
-                    self.new_polygon_part.clear();
-                }
+                self.cancel_current_polygon();
             }
             _ => {}
         }
@@ -204,8 +197,23 @@ impl WindowHandler for UiLogic {
                             self.state = WaitSubject
                         }
                     }
+                } else if keycode == VirtualKeyCode::Escape {
+                    self.cancel_current_polygon()
                 }
             }
+        }
+    }
+}
+
+impl UiLogic {
+    fn cancel_current_polygon(&mut self) {
+        if self.new_polygon_part.is_empty() {
+            self.state = UiState::WaitSubject;
+            self.subject_polygon.clear();
+            self.clipping_polygon.clear();
+            self.result_polygon.clear();
+        } else {
+            self.new_polygon_part.clear();
         }
     }
 }
