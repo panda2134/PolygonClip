@@ -1,7 +1,9 @@
 use std::collections::HashSet;
+
 use speedy2d::dimen::Vec2;
+
 use crate::edge::Edge;
-use crate::polygon::is_point_in_polygon;
+use crate::polygon::{is_point_in_polygon, is_polygon_clockwise};
 use crate::vec::cross_product;
 
 #[derive(Copy, Clone)]
@@ -23,16 +25,19 @@ struct ClippingData<'a> {
     intersect_c: Vec<Vec<IntersectionInfo<'a>>>,
     subject_polygon: Vec<Edge>,
     clipping_polygon: Vec<Edge>,
-    visited: HashSet<usize>,
+    intersection_visited: HashSet<usize>,
+    edge_vis_s: HashSet<usize>,
+    edge_vis_c: HashSet<usize>
 }
 
 fn search_edge (d: &mut ClippingData, walk_subject_edge: bool, edge_index: usize, intersect_id: usize) -> Vec<Edge> {
-    if d.visited.contains(&intersect_id) {
+    if d.intersection_visited.contains(&intersect_id) {
         return vec![]
     } else {
-        d.visited.insert(intersect_id);
+        d.intersection_visited.insert(intersect_id);
     }
     return if walk_subject_edge {
+        d.edge_vis_s.insert(edge_index);
         let cur_inter_pos = d.intersect_s[edge_index].iter().position(|x| x.id == intersect_id).unwrap();
         let cur_inter = d.intersect_s[edge_index][cur_inter_pos];
         if let Some(out_inter) = d.intersect_s[edge_index].get(cur_inter_pos + 1) {
@@ -45,7 +50,7 @@ fn search_edge (d: &mut ClippingData, walk_subject_edge: bool, edge_index: usize
             let mut cur_edges = vec![Edge { from: cur_inter.point, to: d.subject_polygon[edge_index].to }];
             let mut rest = vec![];
             let mut expected_start_pos = d.subject_polygon[edge_index].to;
-            for i in ((edge_index + 1)..(d.subject_polygon.len())).chain(0..edge_index) {
+            for i in ((edge_index + 1)..(d.subject_polygon.len())).chain(0..=edge_index) {
                 // not following current edge
                 if (d.subject_polygon[i].from - expected_start_pos).magnitude_squared() > f32::EPSILON {
                     continue
@@ -63,6 +68,7 @@ fn search_edge (d: &mut ClippingData, walk_subject_edge: bool, edge_index: usize
             cur_edges.into_iter().chain(rest.into_iter()).collect()
         }
     } else {
+        d.edge_vis_c.insert(edge_index);
         let cur_inter_pos = d.intersect_c[edge_index].iter().position(|x| x.id == intersect_id).unwrap();
         let cur_inter = d.intersect_c[edge_index][cur_inter_pos];
         if let Some(in_inter) = d.intersect_c[edge_index].get(cur_inter_pos + 1) {
@@ -75,7 +81,7 @@ fn search_edge (d: &mut ClippingData, walk_subject_edge: bool, edge_index: usize
             let mut cur_edges = vec![Edge { from: cur_inter.point, to: d.clipping_polygon[edge_index].to }];
             let mut rest = vec![];
             let mut expected_start_pos = d.clipping_polygon[edge_index].to;
-            for i in ((edge_index + 1)..(d.clipping_polygon.len())).chain(0..edge_index) {
+            for i in ((edge_index + 1)..(d.clipping_polygon.len())).chain(0..=edge_index) {
                 // not following current edge
                 if (d.clipping_polygon[i].from - expected_start_pos).magnitude_squared() > f32::EPSILON {
                     continue
@@ -102,7 +108,9 @@ pub fn clip_polygon (subject_polygon: &[Edge], clipping_polygon: &[Edge]) -> Vec
         intersect_c: vec![vec![]; clipping_polygon.len()],
         subject_polygon: subject_polygon.to_vec(),
         clipping_polygon: clipping_polygon.to_vec(),
-        visited: HashSet::new(),
+        intersection_visited: HashSet::new(),
+        edge_vis_s: HashSet::new(),
+        edge_vis_c: HashSet::new()
     };
 
     for (i, e_sub) in subject_polygon.iter().enumerate() {
@@ -142,7 +150,7 @@ pub fn clip_polygon (subject_polygon: &[Edge], clipping_polygon: &[Edge]) -> Vec
         let intersect_s_clone = d.intersect_s.clone();
         for (i, it_list) in intersect_s_clone.iter().enumerate() {
             for it in it_list.iter() {
-                if !d.visited.contains(&it.id) {
+                if !d.intersection_visited.contains(&it.id) {
                     let is_in_edge = cross_product(&it.this_edge.get_vector(), &it.other_edge.get_vector()) > 0.0;
                     if is_in_edge {
                         res.extend( search_edge(&mut d, true, i, it.id))
@@ -153,6 +161,35 @@ pub fn clip_polygon (subject_polygon: &[Edge], clipping_polygon: &[Edge]) -> Vec
                 }
             }
         }
+        let mut add_loop = |poly: &[Edge], other_poly: &[Edge], edge_vis: &mut HashSet<usize>| {
+            for (i, edge) in poly.iter().enumerate() {
+                if edge_vis.contains(&i) || !is_point_in_polygon(edge.from, other_poly) {
+                    continue
+                }
+                let mut loop_edges = vec![];
+                let mut expected_start_pos = edge.from;
+                for j in (i..(poly.len())).chain(0..i) {
+                    let x = poly[j];
+                    if edge_vis.contains(&j)
+                        || (x.from - expected_start_pos).magnitude_squared() > f32::EPSILON {
+                        break
+                    }
+                    edge_vis.insert(j);
+                    loop_edges.push(x);
+                    expected_start_pos = x.to;
+                    if (loop_edges.last().unwrap().to - loop_edges.first().unwrap().from)
+                        .magnitude_squared() <= f32::EPSILON {
+                        break;
+                    }
+                }
+                if loop_edges.len() < 3 { continue }
+                if is_polygon_clockwise(&loop_edges) {
+                    res.extend(loop_edges)
+                }
+            }
+        };
+        add_loop(&d.subject_polygon, &d.clipping_polygon,&mut d.edge_vis_s);
+        add_loop(&d.clipping_polygon, &d.subject_polygon,&mut d.edge_vis_c);
         res
     }
 }

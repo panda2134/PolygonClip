@@ -1,4 +1,5 @@
 use speedy2d::dimen::Vec2;
+
 use crate::vec::{cross_product, dist_to_line, inner_product};
 
 #[derive(Copy, Clone, Debug)]
@@ -55,6 +56,7 @@ impl Edge {
 #[cfg(test)]
 mod tests {
     use speedy2d::dimen::Vec2;
+
     use crate::edge::Edge;
 
     #[test]

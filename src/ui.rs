@@ -1,12 +1,13 @@
-use speedy2d::dimen::Vec2;
 use speedy2d::{Graphics2D, Window};
 use speedy2d::color::Color;
+use speedy2d::dimen::Vec2;
 use speedy2d::font::{Font, TextLayout, TextOptions};
 use speedy2d::window::{KeyScancode, MouseButton, VirtualKeyCode, WindowHandler, WindowHelper};
+
 use crate::clipping::clip_polygon;
-use crate::ui::UiState::{WaitSubject};
 use crate::edge::Edge;
-use crate::polygon::is_point_in_polygon;
+use crate::polygon::{is_point_in_polygon, is_polygon_clockwise};
+use crate::ui::UiState::WaitSubject;
 
 const EDGE_THICKNESS: f32 = 3.0;
 const CANDIDATE_THICKNESS: f32 = 1.0;
@@ -142,6 +143,11 @@ impl WindowHandler for UiLogic {
         match button {
             MouseButton::Left => {
                 if self.state != UiState::InputDone {
+                    if let Some(x) = self.new_polygon_part.last() {
+                        if (x - self.cursor).magnitude_squared() < 1.0 {
+                            return; // avoid malformed edges
+                        }
+                    }
                     self.new_polygon_part.push(self.cursor)
                 }
             }
@@ -152,7 +158,13 @@ impl WindowHandler for UiLogic {
                     UiState::WaitClipping => { &mut self.clipping_polygon }
                     _ => { return; }
                 };
-                target.append(&mut point_vec_to_edges(&self.new_polygon_part));
+                let np = &self.new_polygon_part;
+                let poly: Vec<Edge> = np.iter().zip(
+                    np.iter().skip(1).chain(np.iter().take(1))
+                ).map(|(p1, p2)| Edge { from: *p1, to: *p2 }).collect();
+                if target.is_empty() ^ is_polygon_clockwise(&poly) {
+                    target.append(&mut point_vec_to_edges(&self.new_polygon_part));
+                }
                 self.new_polygon_part.clear();
             }
             MouseButton::Middle => {
@@ -174,6 +186,7 @@ impl WindowHandler for UiLogic {
             None => {}
             Some(keycode) => {
                 if keycode == VirtualKeyCode::Return {
+                    if ! self.new_polygon_part.is_empty() { return }
                     match self.state {
                         WaitSubject => {
                             if self.new_polygon_part.len() < 3 && !self.new_polygon_part.is_empty() { return; }

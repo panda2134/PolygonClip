@@ -1,6 +1,6 @@
 extern crate core;
 
-use crate::ui::{run_loop};
+use crate::ui::run_loop;
 
 mod ui;
 mod clipping;
