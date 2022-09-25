@@ -15,19 +15,13 @@ CJKoptions: AutoFakeBold
 
 ## 实验结果
 
-实现了裁剪算法，示意图如下。
+实现了裁剪算法，示意图如下面的图1-3。
 
-输入待裁剪多边形：
+![输入待裁剪多边形](./subject.png)
 
-![Subject Polygon](./subject.png)
+![输入裁剪多边形](./clipping.png)
 
-此后，输入裁剪多边形：
-
-![Clipping Polygon](./clipping.png)
-
-最后得出裁剪结果：
-
-![Result](./result.png)
+![裁剪结果](./result.png)
 
 ## 问题分析
 
@@ -64,3 +58,5 @@ CJKoptions: AutoFakeBold
 ```shell
 cargo run
 ```
+
+此过程会自动下载所需的依赖，并且编译得到可执行文件。然后，即可进行裁剪实验。
