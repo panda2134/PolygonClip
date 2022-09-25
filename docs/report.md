@@ -1,3 +1,8 @@
+---
+CJKmainfont: Noto Sans CJK SC
+CJKoptions: AutoFakeBold
+---
+
 # 第一次作业报告
 
 ## 实验目的
